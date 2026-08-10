@@ -1,6 +1,5 @@
 # ZainiumOS
-
-[![Website](https://img.shields.io/badge/Website-zainiumdynamics.tech-00d9ff?style=flat-square&logo=internetexplorer&logoColor=white)](https://zainiumdynamics.tech)
+[![Website](https://img.shields.io/badge/Website-zainiumdynamics.tech-0052cc?style=flat-square&logo=globe&logoColor=white)](https://zainiumdynamics.tech)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue?style=flat-square&logo=gnu&logoColor=white)](https://www.gnu.org/licenses/gpl-3.0)
 [![Built with Rust](https://img.shields.io/badge/Built%20with-Rust-f74c00?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org)
 [![Linux](https://img.shields.io/badge/Linux-Kernel-FCC624?style=flat-square&logo=linux&logoColor=black)](https://kernel.org)
@@ -130,13 +129,12 @@ ZainiumOS is built on a small set of non-negotiable constraints.
 
 The base system is immutable. User-installed software has no mechanism to reach it. `syshub` is always built from its own upstream source against musl — never repackaged from another distribution. `zexlib` prefers the same, native-first, and only reaches for a musl-compatible binary fallback tier when Zainium's own archive doesn't carry a package yet. The package state is a single file, not a database scattered across `/var/lib`. Every install and every removal is fully reversible because every change is recorded in a receipt. The environment is managed programmatically, not through fragile shell script inheritance. And the entire userland can be wiped and rebuilt without touching the running OS.
 
-**Determinism is ZainiumOS's first rule, and it is not negotiable.** Every build, every install, every upgrade produces the same result from the same inputs, every time. ZainiumOS does not favor any upstream, is not built to compete with any other distribution or the market, and does not exist to chase trends — it exists to be deterministic. Nothing in the system is allowed to compromise that, for any reason.
+**Determinism is Zainium Dynamics first rule, and it is not negotiable.** Every build, every install, every upgrade produces the same result from the same inputs, every time. ZainiumOS does not favor any upstream, is not built to compete with any other distribution or the market, and does not exist to chase trends — it exists to be deterministic. Nothing in the system is allowed to compromise that, for any reason.
 
----
 
 Developer and System Architect: **Ali Zain**
 
----
+
 
 ## License
 
