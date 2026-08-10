@@ -1,15 +1,13 @@
 # ZainiumOS
 
-**Built to Endure. Programmed to Lead.**
-
-[![Website](https://img.shields.io/badge/Website-zainiumdynamics.tech-0d1117?style=flat-square&logo=internetexplorer&logoColor=00d9ff&labelColor=0d1117&color=00d9ff)](https://zainiumdynamics.tech)
+[![Website](https://img.shields.io/badge/Website-zainiumdynamics.tech-00d9ff?style=flat-square&logo=internetexplorer&logoColor=white)](https://zainiumdynamics.tech)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue?style=flat-square&logo=gnu&logoColor=white)](https://www.gnu.org/licenses/gpl-3.0)
 [![Built with Rust](https://img.shields.io/badge/Built%20with-Rust-f74c00?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org)
 [![Linux](https://img.shields.io/badge/Linux-Kernel-FCC624?style=flat-square&logo=linux&logoColor=black)](https://kernel.org)
 [![LFS](https://img.shields.io/badge/Base-Linux%20From%20Scratch-2c3e50?style=flat-square&logo=linuxserver&logoColor=white)](https://www.linuxfromscratch.org)
 [![Platform](https://img.shields.io/badge/Platform-x86__64-6e40c9?style=flat-square&logo=intel&logoColor=white)](https://zainiumdynamics.tech)
-[![musl libc](https://img.shields.io/badge/libc-musl-darkgreen?style=flat-square&logoColor=white)](https://musl.libc.org)
-[![Status](https://img.shields.io/badge/Status-Active%20Development-brightgreen?style=flat-square)](https://zainiumdynamics.tech)
+[![musl libc](https://img.shields.io/badge/libc-musl-2e7d32?style=flat-square&logoColor=white)](https://musl.libc.org)
+[![Status](https://img.shields.io/badge/Status-Active%20Development-2ea44f?style=flat-square)](https://zainiumdynamics.tech)
 
 ZainiumOS is a next-generation operating system built from scratch on a Linux From Scratch (LFS) foundation, targeting **musl libc** rather than glibc. It is not derived from any existing distribution and does not repackage any existing distribution's binaries. The filesystem layout, package management model, environment system, cross-compilation toolchain, and every shipped package are original work, designed and built by **Ali Zain**.
 
@@ -35,11 +33,10 @@ The base system (`syshub`) is compiled entirely from upstream source against **m
 ├── run/
 ├── sys/
 │
-├── zaisys/                            # Kernel and early-boot environment
-│   └── kernel/                        # Kernel binary and quantra-ramfs
-│
-│
 └── overlayer/
+    │
+    ├── zaisys/                        # Kernel and early-boot environment
+    │   └── kernel/                    # Kernel binary and quantra-ramfs
     │
     ├── syshub/                        # Immutable Base OS — read-only at runtime
     │   ├── bin/                       # Core system binaries, cross-toolchain (gcc, clang, rustc, cargo)
@@ -133,11 +130,11 @@ ZainiumOS is built on a small set of non-negotiable constraints.
 
 The base system is immutable. User-installed software has no mechanism to reach it. `syshub` is always built from its own upstream source against musl — never repackaged from another distribution. `zexlib` prefers the same, native-first, and only reaches for a musl-compatible binary fallback tier when Zainium's own archive doesn't carry a package yet. The package state is a single file, not a database scattered across `/var/lib`. Every install and every removal is fully reversible because every change is recorded in a receipt. The environment is managed programmatically, not through fragile shell script inheritance. And the entire userland can be wiped and rebuilt without touching the running OS.
 
+**Determinism is ZainiumOS's first rule, and it is not negotiable.** Every build, every install, every upgrade produces the same result from the same inputs, every time. ZainiumOS does not favor any upstream, is not built to compete with any other distribution or the market, and does not exist to chase trends — it exists to be deterministic. Nothing in the system is allowed to compromise that, for any reason.
+
 ---
 
-## Creator
-
-ZainiumOS is designed and built by **Ali Zain**.
+Developer and System Architect: **Ali Zain**
 
 ---
 
