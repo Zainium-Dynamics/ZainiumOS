@@ -11,15 +11,17 @@
 [![musl libc](https://img.shields.io/badge/libc-musl-darkgreen?style=flat-square&logoColor=white)](https://musl.libc.org)
 [![Status](https://img.shields.io/badge/Status-Active%20Development-brightgreen?style=flat-square)](https://zainiumdynamics.tech)
 
-ZainiumOS is a next-generation operating system built from scratch on a Linux From Scratch (LFS) foundation. It is not derived from any existing distribution. The filesystem layout, package management model, environment system, and core toolchain are all original work, designed and built by **Ali Zain**.
+ZainiumOS is a next-generation operating system built from scratch on a Linux From Scratch (LFS) foundation, targeting **musl libc** rather than glibc. It is not derived from any existing distribution and does not repackage any existing distribution's binaries. The filesystem layout, package management model, environment system, cross-compilation toolchain, and every shipped package are original work, designed and built by **Ali Zain**.
 
 ---
 
 ## What Is ZainiumOS
 
-Most Linux distributions carry decades of structural compromise — shared directories, mutable system state, dependency graphs that span the entire filesystem, and package managers that can silently overwrite critical binaries. ZainiumOS was built to eliminate all of that.
+Most Linux distributions carry decades of structural compromise — shared directories, mutable system state, dependency graphs that span the entire filesystem, package managers that can silently overwrite critical binaries, and a libc (glibc) that trades size and simplicity for feature breadth. ZainiumOS was built to eliminate all of that.
 
 Starting from LFS, every component of the system is intentional. The filesystem is divided into a permanently clean, immutable base layer and a fully isolated userland layer. These two layers never share the same physical location on disk. They are merged at runtime through a precisely controlled union and symlink model. The result is an operating system where the core can never be broken by anything that happens in userland.
+
+The base system (`syshub`) is compiled entirely from upstream source against **musl libc**, using a purpose-built cross-compilation toolchain (`x86_64-zainium-linux-musl`) — never assembled from another distribution's precompiled binaries. The userland package manager, Zex, sources packages the same way whenever possible, and only falls back to compatible musl binary mirrors (Void, Alpine, Chimera, in that priority order) for the long tail of software Zainium's own archive doesn't carry yet.
 
 ---
 
@@ -40,10 +42,13 @@ Starting from LFS, every component of the system is intentional. The filesystem 
 └── overlayer/
     │
     ├── syshub/                        # Immutable Base OS — read-only at runtime
-    │   ├── bin/                       # Core system binaries (coreutils, cmake, etc.)
+    │   ├── bin/                       # Core system binaries, cross-toolchain (gcc, clang, rustc, cargo)
     │   ├── sbin/                      # Essential system administration binaries
-    │   ├── lib/                       # Base system libraries
+    │   ├── lib/                       # Base system libraries (musl, LLVM, GStreamer, AppArmor, …)
+    │   ├── include/                   # Headers for the base toolchain and libraries
+    │   ├── share/                     # Shared data: zoneinfo, man pages, pkgconfig, …
     │   ├── etc/                       # Core system configuration
+    │   ├── x86_64-zainium-linux-musl/ # musl sysroot (loader, libc, target headers/libs)
     │   ├── drivers/                   # Hardware modules and system-level driver hooks
     │   │   ├── hardware/              # Firmware, GPU, sensor, peripheral modules
     │   │   ├── system/                # Zex operation drivers (install/detach/upgrade)
@@ -74,27 +79,37 @@ Starting from LFS, every component of the system is intentional. The filesystem 
 
 ### syshub — The Immutable Base
 
-`syshub` is the complete, self-sufficient operating system. It contains the desktop environment, coreutils, cmake, essential libraries, and all system-critical tooling. It is mounted read-only at runtime.
+`syshub` is the complete, self-sufficient operating system: musl libc and its dynamic linker, the `x86_64-zainium-linux-musl` cross-toolchain (GCC, LLVM/Clang), coreutils, and system-critical libraries and services (GStreamer, GPGME, libseccomp, AppArmor, and more) — all built from upstream source specifically for this target. It is mounted read-only at runtime.
 
-No package installed by the user ever enters `syshub`. It stays permanently clean. There is no dependency hell possible at the base layer because the base layer is never modified after installation. If the entire `zexlib` userland is deleted or corrupted, the system still boots fully into a working desktop using only `syshub`.
+No package installed by the user ever enters `syshub`. It stays permanently clean. There is no dependency hell possible at the base layer because the base layer is never modified after installation. If the entire `zexlib` userland is deleted or corrupted, the system still boots fully into a working base system using only `syshub`.
 
 ### zexlib — The Writable Userland
 
 `zexlib` is where all user-installed software lives. Its `union/` directory is symlinked with `syshub` at runtime, so installed packages appear alongside base system tools transparently. The user sees one unified system. On disk, the two layers are physically separate.
 
-The `union/bin/`, `union/lib/`, and other subdirectories each hold either files extracted by the package manager or symlinks pointing back into `syshub`. The base system files are never duplicated — only referenced. A package installed from Alpine or Chimera extracts into `union/` and is immediately available on the `$PATH` without touching `syshub`.
+The `union/bin/`, `union/lib/`, and other subdirectories each hold either files extracted by the package manager or symlinks pointing back into `syshub`. The base system files are never duplicated — only referenced. `zexlib` packages are dynamically linked binaries that rely on `syshub` being present at its fixed runtime path, or fully static musl binaries with no runtime dependency on `syshub` at all — both are first-class, source-built targets, never foreign-distribution binaries.
 
 ---
 
 ## Package Management
 
-ZainiumOS uses **Zex** as its package manager. Zex operates entirely within `zexlib`. It sources packages from Alpine, Chimera, and the native `.zex` format. The user never interacts with these backends directly — Zex presents a single unified interface.
+ZainiumOS uses **Zex** as its package manager. Zex operates entirely within `zexlib`, and every source it pulls from is resolved through a strict, priority-ordered tier system — never a flat, unordered mirror list:
+
+| Tier | Source | Format | Role |
+|------|--------|--------|------|
+| 1 | `archive.zainiumdynamics.tech` (Zainium's own core + userland archive) | `.zex` | Primary — native Zainium builds, always tried first |
+| 2 | Void Linux musl ports | `xbps` | Power-user fallback, deliberately ranked above Alpine |
+| 3 | Alpine Linux (main + community) | `apk` | Embedded/minimal fallback, lowest-priority binary tier |
+| 4 | Chimera Linux (main + user) | `adb` | Last-resort binary fallback |
+| — | crates.io source-build engine | `cargo` | Rust crates built from source, static musl (`+crt-static`), not a binary mirror at all |
+
+If a package exists in the Tier 1 native archive, Zex uses it and never consults the lower tiers. A package only falls through to Void, then Alpine, then Chimera if Zainium's own archive doesn't carry it yet — and even then, every package that installs into `syshub` itself is still built from upstream source against `x86_64-zainium-linux-musl` by Zex's own build pipeline, never repackaged from a foreign binary. The fallback tiers exist to keep `zexlib` usable on day one for the long tail of userland software, without waiting for Zainium's own archive to carry every package first.
 
 ### packages.toml — The Master State File
 
-When a package is installed, Zex writes a record into `zexlib/registry/packages.toml`. This file is the single source of truth for the system's desired state. Each entry records the package name, version, origin mirror, and its full dependency graph inline. Dependencies are not resolved at install time by scanning the filesystem — they are declared in the graph at write time, so Zex already knows what is needed before a single file is extracted.
+When a package is installed, Zex writes a record into `zexlib/registry/packages.toml`. This file is the single source of truth for the system's desired state. Each entry records the package name, version, upstream source, and its full dependency graph inline. Dependencies are not resolved at install time by scanning the filesystem — they are declared in the graph at write time, so Zex already knows what is needed before a single file is built or extracted.
 
-When the user runs an upgrade, Zex reads `packages.toml`, contacts the appropriate mirrors, and updates the entries and the files in `union/` directly. There is no separate upgrade database. The same file governs both state and update resolution.
+When the user runs an upgrade, Zex reads `packages.toml`, rebuilds or fetches the updated sources, and updates the entries and the files in `union/` directly. There is no separate upgrade database. The same file governs both state and update resolution.
 
 ### installed/ — Package Receipts
 
@@ -102,7 +117,7 @@ Every package that Zex installs also generates a receipt file at `zexlib/registr
 
 ### Collision Blocking
 
-Before extracting any package, Zex checks whether any of the incoming files conflict with files already present in `union/`. If a conflict is detected, the installation is aborted. Files from `syshub` cannot be overwritten under any circumstance. This guarantees that no package — regardless of origin — can silently replace a base system binary.
+Before extracting any package, Zex checks whether any of the incoming files conflict with files already present in `union/`. If a conflict is detected, the installation is aborted. Files from `syshub` cannot be overwritten under any circumstance. This guarantees that no package can silently replace a base system binary.
 
 ---
 
@@ -116,7 +131,7 @@ ZainiumOS manages the user environment through a dedicated Rust-based environmen
 
 ZainiumOS is built on a small set of non-negotiable constraints.
 
-The base system is immutable. User-installed software has no mechanism to reach it. The package state is a single file, not a database scattered across `/var/lib`. Every install and every removal is fully reversible because every change is recorded in a receipt. The environment is managed programmatically, not through fragile shell script inheritance. And the entire userland can be wiped and rebuilt without touching the running OS.
+The base system is immutable. User-installed software has no mechanism to reach it. `syshub` is always built from its own upstream source against musl — never repackaged from another distribution. `zexlib` prefers the same, native-first, and only reaches for a musl-compatible binary fallback tier when Zainium's own archive doesn't carry a package yet. The package state is a single file, not a database scattered across `/var/lib`. Every install and every removal is fully reversible because every change is recorded in a receipt. The environment is managed programmatically, not through fragile shell script inheritance. And the entire userland can be wiped and rebuilt without touching the running OS.
 
 ---
 
