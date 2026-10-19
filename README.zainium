@@ -1,0 +1,115 @@
+Zainium OS
+==========
+
+Zainium OS is an independent Linux operating system by Zainium Dynamics. It is
+not based on any other distribution. It uses the Linux kernel (linux-evl), the
+musl C library, systemd as init, and the COSMIC desktop. It runs on x86_64 and
+is licensed under GPL-3.0.
+
+Zainium OS takes a different approach from other Linux distributions. The main
+differences are below.
+
+
+1. No /usr, /etc, /bin or /lib at the root
+------------------------------------------
+
+The root directory holds only the virtual file systems (/dev, /proc, /sys,
+/run, /tmp), /home, /root, and /overlayer. The whole operating system lives
+under /overlayer:
+
+  /overlayer/syshub    the base system (programs, libraries, configuration)
+  /overlayer/zexlib    software you install, and the package records
+  /overlayer/zaisys    the kernel, the initramfs and the boot loader files
+  /overlayer/agents    instructions and skills for AI coding agents
+
+Programs are built for these paths. For programs that still look for /usr,
+/etc or /bin, the libsys_resolver library maps those paths to the Zainium
+ones, if the requested path does not exist. It only works for dynamically
+linked programs that are not setuid.
+
+
+2. The base and your software are separate layers
+-------------------------------------------------
+
+The base system (syshub) and the software you install (zexlib/union) are kept
+in different places on disk. At boot, quantra-ramfs (the initramfs) joins them
+with OverlayFS into one view at /overlayer/syshub. Programs see a single
+system. On disk, nothing you install is written into the base.
+
+The base is not changed while the system runs. Base upgrades are downloaded
+and staged, then applied at the next boot, before the system is mounted. The
+last applied upgrade can be undone at the next boot. Your installed software
+can be removed or wiped without touching the base.
+
+As root, `elevate` refuses commands such as rm, mv and cp on the base, the
+boot files and a staged upgrade.
+
+
+3. musl only, in its own directory
+----------------------------------
+
+The base is built from source against musl with the x86_64-zainium-linux-musl
+toolchain. musl and its loader live in their own directory:
+
+  /overlayer/syshub/x86_64-zainium-linux-musl/lib/ld-musl-x86_64.so.1
+
+There is no glibc in the base, and base upgrades reject glibc-linked files.
+
+If you install glibc, its loader and libraries go into the lib and bin
+directories. They have different file names from musl's (libc.so.6 and
+ld-linux-x86-64.so.2), so glibc and musl do not conflict. Every program
+records which loader it uses, so musl programs keep running with musl.
+Zainium OS itself is musl-based. Building your own software against musl or
+glibc is your choice.
+
+
+4. One package manager: zex
+---------------------------
+
+zex installs native Zainium packages (.zex) first. When Zainium's archive does
+not have a package, zex can install it from Void Linux (musl), Alpine Linux or
+Chimera Linux, and adjusts it to the Zainium paths (program loader, library
+search path, script interpreters). Before installing, zex checks that every
+library the package needs is available, and it never replaces a file of the
+base. See /overlayer/zex.md.
+
+Desktop applications are also available through Flatpak (zex install flatpak)
+and the COSMIC Store.
+
+
+Main components
+---------------
+
+  Boot loader      Limine (UEFI and BIOS)
+  Kernel           linux-evl
+  Initramfs        quantra-ramfs (finds the disk, joins the layers, applies
+                   staged base upgrades, starts the Plymouth splash)
+  Init             systemd
+  Login            greetd with cosmic-greeter
+  Desktop          COSMIC
+  Packages         zex
+  Root access      elevate (replaces sudo), elevate-pam
+  Network, audio   NetworkManager, PipeWire
+
+
+Status
+------
+
+Zainium OS is in active development.
+
+- Not every package from Void, Alpine or Chimera works after adjustment. zex
+  refuses packages whose libraries no repository provides, unless you confirm.
+- Programs that hard-code /usr, /etc or /bin paths and are static or setuid
+  are not covered by libsys_resolver.
+
+
+More
+----
+
+  /overlayer/architecture.md   how the system is put together
+  /overlayer/zex.md            package manager usage
+  /overlayer/agents/AGENTS.md  instructions for AI coding agents
+  https://zainiumdynamics.tech
+
+
+Copyright (C) 2026 Zainium Dynamics. Licensed under GPL-3.0.

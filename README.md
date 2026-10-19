@@ -8,136 +8,87 @@
 [![musl libc](https://img.shields.io/badge/libc-musl-2e7d32?style=flat-square&logoColor=white)](https://musl.libc.org)
 [![Status](https://img.shields.io/badge/Status-Active%20Development-2ea44f?style=flat-square)](https://zainiumdynamics.tech)
 
-ZainiumOS is a next-generation operating system built from scratch on a Linux From Scratch (LFS) foundation, targeting **musl libc** rather than glibc. It is not derived from any existing distribution and does not repackage any existing distribution's binaries. The filesystem layout, package management model, environment system, cross-compilation toolchain, and every shipped package are original work, designed and built by **Ali Zain**.
+ZainiumOS is an independent Linux operating system by Zainium Dynamics, built from a Linux From Scratch foundation on **musl libc**. It is not derived from any other distribution. It runs the Linux kernel (`linux-evl`), systemd as init and the COSMIC desktop on x86_64.
+
+The base system is compiled from upstream source with Zainium's own `x86_64-zainium-linux-musl` toolchain. Upstream software such as systemd, COSMIC, Mesa and musl is built from its source, not taken from another distribution's binaries. Original to ZainiumOS are the filesystem layout and its layer model, the package manager **zex**, the initramfs **quantra-ramfs**, the root tool **elevate**, the installer, the ISO builder and the package recipes.
 
 ---
 
-## What Is ZainiumOS
+## What is different
 
-Most Linux distributions carry decades of structural compromise — shared directories, mutable system state, dependency graphs that span the entire filesystem, package managers that can silently overwrite critical binaries, and a libc (glibc) that trades size and simplicity for feature breadth. ZainiumOS was built to eliminate all of that.
-
-Starting from LFS, every component of the system is intentional. The filesystem is divided into a permanently clean, immutable base layer and a fully isolated userland layer. These two layers never share the same physical location on disk. They are merged at runtime through a precisely controlled union and symlink model. The result is an operating system where the core can never be broken by anything that happens in userland.
-
-The base system (`syshub`) is compiled entirely from upstream source against **musl libc**, using a purpose-built cross-compilation toolchain (`x86_64-zainium-linux-musl`) — never assembled from another distribution's precompiled binaries. The userland package manager, Zex, sources packages the same way whenever possible, and only falls back to compatible musl binary mirrors (Void, Alpine, Chimera, in that priority order) for the long tail of software Zainium's own archive doesn't carry yet.
+1. **No `/usr`, `/etc`, `/bin` or `/lib` at the root.** The whole OS lives under `/overlayer`. For software that still expects those paths, the `libsys_resolver` library maps them to the Zainium paths when the requested path does not exist (dynamically linked, non-setuid programs).
+2. **The base and installed software are separate layers.** The base (`syshub`) and the software you install (`zexlib/union`) are stored apart on disk and joined at boot with OverlayFS into one view at `/overlayer/syshub`. Nothing you install is written into the base, and the userland can be wiped without touching it.
+3. **Base upgrades happen at boot.** They are downloaded and staged while the system runs, then applied by quantra-ramfs at the next boot, before the system is mounted. The last applied upgrade can be undone at the next boot.
+4. **musl only, in its own directory.** musl lives in `/overlayer/syshub/x86_64-zainium-linux-musl/`. There is no glibc in the base, and base upgrades reject glibc-linked files.
+5. **One package manager for several sources.** zex installs native `.zex` packages first and can fall back to Void Linux (musl), Alpine Linux and Chimera Linux packages, adjusting them to Zainium paths. It checks every package's library needs before installing and never replaces a base file.
 
 ---
 
-## Filesystem Architecture
+## Filesystem layout
 
-```
-/ (Root)
-├── dev/
-├── home/
-├── proc/
-├── run/
-├── sys/
-│
+```text
+/
+├── dev/ proc/ sys/ run/ tmp/      virtual file systems
+├── home/   root/                  user data
+├── var -> /overlayer/syshub/var   compatibility link
 └── overlayer/
-    │
-    ├── zaisys/                        # Kernel and early-boot environment
-    │   └── kernel/                    # Kernel binary and quantra-ramfs
-    │
-    ├── syshub/                        # Immutable Base OS — read-only at runtime
-    │   ├── bin/                       # Core system binaries, cross-toolchain (gcc, clang, rustc, cargo)
-    │   ├── sbin/                      # Essential system administration binaries
-    │   ├── lib/                       # Base system libraries (musl, LLVM, GStreamer, AppArmor, …)
-    │   ├── include/                   # Headers for the base toolchain and libraries
-    │   ├── share/                     # Shared data: zoneinfo, man pages, pkgconfig, …
-    │   ├── etc/                       # Core system configuration
-    │   ├── x86_64-zainium-linux-musl/ # musl sysroot (loader, libc, target headers/libs)
-    │   ├── drivers/                   # Hardware modules and system-level driver hooks
-    │   │   ├── hardware/              # Firmware, GPU, sensor, peripheral modules
-    │   │   ├── system/                # Zex operation drivers (install/detach/upgrade)
-    │   │   └── modules/               # Kernel modules
-    │   └── engine/                    # Init and service engine
-    │       ├── services/              # Zainium System service definitions
-    │       └── quantra                # PID 1 init binary
-    │
-    └── zexlib/                        # Writable Userland — all installed packages land here
-        ├── registry/
-        │   ├── packages.toml          # Master package state — versions, origins, dependency graph
-        │   └── installed/             # Per-package receipt files
-        │       ├── nginx.toml
-        │       ├── rust.toml
-        │       └── ...
-        └── union/                     # Active merged layer — symlinked with syshub at runtime
-            ├── bin/                   # Installed package binaries + syshub/bin symlinks
-            ├── sbin/
-            ├── lib/                   # Installed libraries + syshub/lib symlinks
-            ├── etc/                   # Userland configuration
-            ├── var/                   # Runtime and application data
-            └── tmp/                   # Temporary files
+    ├── syshub/        the system view: base + installed software (OverlayFS)
+    │   ├── bin/ sbin/ libexec/ lib/ include/ share/ etc/ var/
+    │   ├── x86_64-zainium-linux-musl/   musl loader, libc, headers, toolchain
+    │   ├── drivers/                     kernel modules and firmware
+    │   └── engine/services/             base package list, mirror configuration
+    ├── zexlib/
+    │   ├── union/     files of installed packages (the OverlayFS upper layer)
+    │   ├── work/      OverlayFS work directory
+    │   ├── registry/  one receipt per installed package, index, caches, trust keys
+    │   └── var/       data kept outside the union (flatpak's system installation)
+    ├── zaisys/        kernel, initramfs, Limine boot loader (read-only)
+    ├── agents/        instructions and skills for AI coding agents
+    └── README.zainium  architecture.md  zex.md
 ```
 
----
+## Boot
 
-## The Two Layers
+1. **Limine** (UEFI or BIOS) loads `linux-evl` and `quantra-ramfs.img`.
+2. **quantra-ramfs** starts the Plymouth splash, mounts the root (a disk partition, or the live ISO's zstd-compressed EROFS image), applies a staged base upgrade if one is waiting, and builds the OverlayFS view.
+3. **systemd** starts as PID 1 and runs **greetd** with **cosmic-greeter**, which starts the **COSMIC** desktop.
 
-### syshub — The Immutable Base
+## Packages: zex
 
-`syshub` is the complete, self-sufficient operating system: musl libc and its dynamic linker, the `x86_64-zainium-linux-musl` cross-toolchain (GCC, LLVM/Clang), coreutils, and system-critical libraries and services (GStreamer, GPGME, libseccomp, AppArmor, and more) — all built from upstream source specifically for this target. It is mounted read-only at runtime.
+| Tier | Source | Format |
+|------|--------|--------|
+| 1 | `archive.zainiumdynamics.tech`, Zainium's own archive | `.zex` |
+| 2 | Void Linux (musl) | `.xbps` |
+| 3 | Alpine Linux | `.apk` |
+| 4 | Chimera Linux | `.apk` (ADB) |
+| — | crates.io | Rust crates |
 
-No package installed by the user ever enters `syshub`. It stays permanently clean. There is no dependency hell possible at the base layer because the base layer is never modified after installation. If the entire `zexlib` userland is deleted or corrupted, the system still boots fully into a working base system using only `syshub`.
+All sources are queried at once and the first one in priority order that has the package is used. Every install writes a receipt listing its files, and removal deletes exactly those files. Desktop applications are also available through Flatpak and the COSMIC Store. Full usage: [zex.md](zex.md).
 
-### zexlib — The Writable Userland
+## musl and glibc
 
-`zexlib` is where all user-installed software lives. Its `union/` directory is symlinked with `syshub` at runtime, so installed packages appear alongside base system tools transparently. The user sees one unified system. On disk, the two layers are physically separate.
+ZainiumOS is musl-based. If a user installs glibc, its loader and libraries go into the `lib` and `bin` directories under different file names from musl's (`ld-linux-x86-64.so.2` and `libc.so.6`, against musl's `ld-musl-x86_64.so.1` and `libc.so`), so the two do not conflict. Each program runs with the loader it was linked for. Building your own software against musl or glibc is your choice.
 
-The `union/bin/`, `union/lib/`, and other subdirectories each hold either files extracted by the package manager or symlinks pointing back into `syshub`. The base system files are never duplicated — only referenced. `zexlib` packages are dynamically linked binaries that rely on `syshub` being present at its fixed runtime path, or fully static musl binaries with no runtime dependency on `syshub` at all — both are first-class, source-built targets, never foreign-distribution binaries.
+## Documentation
 
----
+- [README.zainium](README.zainium) — overview of the OS, as shipped in `/overlayer`
+- [architecture.md](architecture.md) — layers, boot, libraries, packages and upgrades in detail
+- [zex.md](zex.md) — package manager usage
 
-## Package Management
+## Status
 
-ZainiumOS uses **Zex** as its package manager. Zex operates entirely within `zexlib`, and every source it pulls from is resolved through a strict, priority-ordered tier system — never a flat, unordered mirror list:
+ZainiumOS is in active development. Not every package from Void, Alpine or Chimera works after adjustment; zex refuses packages whose libraries no repository provides unless you confirm. Static or setuid programs that hard-code `/usr`, `/etc` or `/bin` paths are not covered by `libsys_resolver`.
 
-| Tier | Source | Format | Role |
-|------|--------|--------|------|
-| 1 | `archive.zainiumdynamics.tech` (Zainium's own core + userland archive) | `.zex` | Primary — native Zainium builds, always tried first |
-| 2 | Void Linux musl ports | `xbps` | Power-user fallback, deliberately ranked above Alpine |
-| 3 | Alpine Linux (main + community) | `apk` | Embedded/minimal fallback, lowest-priority binary tier |
-| 4 | Chimera Linux (main + user) | `adb` | Last-resort binary fallback |
-| — | crates.io source-build engine | `cargo` | Rust crates built from source, static musl (`+crt-static`), not a binary mirror at all |
+## Design goal
 
-If a package exists in the Tier 1 native archive, Zex uses it and never consults the lower tiers. A package only falls through to Void, then Alpine, then Chimera if Zainium's own archive doesn't carry it yet — and even then, every package that installs into `syshub` itself is still built from upstream source against `x86_64-zainium-linux-musl` by Zex's own build pipeline, never repackaged from a foreign binary. The fallback tiers exist to keep `zexlib` usable on day one for the long tail of userland software, without waiting for Zainium's own archive to carry every package first.
-
-### packages.toml — The Master State File
-
-When a package is installed, Zex writes a record into `zexlib/registry/packages.toml`. This file is the single source of truth for the system's desired state. Each entry records the package name, version, upstream source, and its full dependency graph inline. Dependencies are not resolved at install time by scanning the filesystem — they are declared in the graph at write time, so Zex already knows what is needed before a single file is built or extracted.
-
-When the user runs an upgrade, Zex reads `packages.toml`, rebuilds or fetches the updated sources, and updates the entries and the files in `union/` directly. There is no separate upgrade database. The same file governs both state and update resolution.
-
-### installed/ — Package Receipts
-
-Every package that Zex installs also generates a receipt file at `zexlib/registry/installed/<name>.toml`. The receipt records every file that the package placed into the `union/` layer. When a package is removed, Zex reads only its receipt and deletes exactly those files. Nothing else is touched. No orphaned files, no leftover libraries, no stale configuration.
-
-### Collision Blocking
-
-Before extracting any package, Zex checks whether any of the incoming files conflict with files already present in `union/`. If a conflict is detected, the installation is aborted. Files from `syshub` cannot be overwritten under any circumstance. This guarantees that no package can silently replace a base system binary.
+Determinism is Zainium Dynamics' first rule: the same inputs should produce the same build, install and upgrade, every time.
 
 ---
 
-## Environment System
-
-ZainiumOS manages the user environment through a dedicated Rust-based environment binary. This replaces the traditional `/etc/profile.d` shell script chain. It sets the `$PATH`, configures aliases, and manages `.bashrc` behavior from a single controlled source. The profile script and `.bashrc` equivalent are both handled by this environment layer rather than being scattered across the filesystem.
-
----
-
-## Design Principles
-
-ZainiumOS is built on a small set of non-negotiable constraints.
-
-The base system is immutable. User-installed software has no mechanism to reach it. `syshub` is always built from its own upstream source against musl — never repackaged from another distribution. `zexlib` prefers the same, native-first, and only reaches for a musl-compatible binary fallback tier when Zainium's own archive doesn't carry a package yet. The package state is a single file, not a database scattered across `/var/lib`. Every install and every removal is fully reversible because every change is recorded in a receipt. The environment is managed programmatically, not through fragile shell script inheritance. And the entire userland can be wiped and rebuilt without touching the running OS.
-
-**Determinism is Zainium Dynamics first rule, and it is not negotiable.** Every build, every install, every upgrade produces the same result from the same inputs, every time. ZainiumOS does not favor any upstream, is not built to compete with any other distribution or the market, and does not exist to chase trends — it exists to be deterministic. Nothing in the system is allowed to compromise that, for any reason.
-
-
-Developer and System Architect: **Ali Zain**
-
-
+Created and maintained by **Ali Zain** ([Zainium Dynamics](https://zainiumdynamics.tech)).
 
 ## License
 
-ZainiumOS is free software licensed under the **GNU General Public License v3.0 (GPL-3.0)**.
+Copyright (C) 2026 Ali Zain / Zainium Dynamics.
 
-You are free to use, study, modify, and distribute this software under the terms of the GPL v3. Any derivative work must also be distributed under the same license. See the [LICENSE](LICENSE) file for the full license text, or visit [https://www.gnu.org/licenses/gpl-3.0.html](https://www.gnu.org/licenses/gpl-3.0.html).
+ZainiumOS is free software licensed under the **GNU General Public License v3.0 (GPL-3.0)**. You are free to use, study, modify and distribute it under the terms of the GPL v3; derivative works must be distributed under the same license. See [LICENSE](LICENSE), or [gnu.org/licenses/gpl-3.0](https://www.gnu.org/licenses/gpl-3.0.html).
