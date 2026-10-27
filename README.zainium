@@ -45,8 +45,8 @@ As root, `elevate` refuses commands such as rm, mv and cp on the base, the
 boot files and a staged upgrade.
 
 
-3. musl only, in its own directory
-----------------------------------
+3. musl in the base, glibc in its own directory
+-----------------------------------------------
 
 The base is built from source against musl with the x86_64-zainium-linux-musl
 toolchain. musl and its loader live in their own directory:
@@ -55,12 +55,21 @@ toolchain. musl and its loader live in their own directory:
 
 There is no glibc in the base, and base upgrades reject glibc-linked files.
 
-If you install glibc, its loader and libraries go into the lib and bin
-directories. They have different file names from musl's (libc.so.6 and
-ld-linux-x86-64.so.2), so glibc and musl do not conflict. Every program
-records which loader it uses, so musl programs keep running with musl.
-Zainium OS itself is musl-based. Building your own software against musl or
-glibc is your choice.
+glibc is a package with its own directory, apart from musl's:
+
+  elevate zex install glibc             loader, libraries, locales, tools
+  elevate zex install glibc-toolchain   gcc and g++ for glibc, with glibc-dev
+
+  /overlayer/zexlib/union/x86_64-zainium-linux-gnu/lib/ld-linux-x86-64.so.2
+
+Nothing of glibc goes into the shared bin, lib or include directories, so gcc,
+ldd, the headers and every musl program stay musl's. A glibc program runs with
+glibc's loader and loads libraries only from glibc's directory: the libraries
+of the base are built for musl and cannot load into it. glibc reads the
+system's configuration in /overlayer/syshub/etc (users, hosts, DNS, timezone).
+A program built elsewhere that asks for /lib64/ld-linux-x86-64.so.2 is started
+with glibc's loader. To build for glibc, use x86_64-zainium-linux-gnu-gcc or
+x86_64-zainium-linux-gnu-g++; plain gcc builds for musl.
 
 
 4. One package manager: zex

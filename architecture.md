@@ -45,6 +45,7 @@ There is no `/usr`, `/etc`, `/bin`, `/sbin`, `/lib` or `/boot` at the root.
     │   └── engine/services/            syshub.toml (base package list), zex_services.toml (mirrors)
     ├── zexlib/
     │   ├── union/                      files of installed packages (bin, lib, etc, share, …)
+    │   │   └── x86_64-zainium-linux-gnu/  glibc (when installed): loader, libc, headers
     │   ├── work/                       OverlayFS work directory
     │   ├── registry/                   one receipt per installed package, package index, caches, trust keys
     │   └── var/                        data kept outside the union (flatpak's system installation)
@@ -110,19 +111,21 @@ There is no glibc in the base. Base upgrades reject files linked against glibc.
 
 ### glibc next to musl
 
-If a user installs glibc, its loader and libraries go into the `lib` and `bin` directories. Their file names differ from musl's:
+glibc is a userland package (`glibc`, with `glibc-dev` and `glibc-toolchain` for building) and lives in its own directory, as musl does in the base:
 
 | | musl | glibc |
 | :--- | :--- | :--- |
-| Directory | `x86_64-zainium-linux-musl/lib` | `lib` |
-| Loader | `ld-musl-x86_64.so.1` | `ld-linux-x86-64.so.2` |
-| C library | `libc.so` | `libc.so.6` |
+| Directory | `/overlayer/syshub/x86_64-zainium-linux-musl` | `/overlayer/zexlib/union/x86_64-zainium-linux-gnu` |
+| Loader | `lib/ld-musl-x86_64.so.1` | `lib/ld-linux-x86-64.so.2` |
+| C library | `lib/libc.so` | `lib/libc.so.6` |
+| Compiler | `gcc`, `g++`, `cc`, `c99` | `x86_64-zainium-linux-gnu-gcc`, `x86_64-zainium-linux-gnu-g++` |
+| `ldd` | on `PATH` | in glibc's `bin`, not on `PATH` |
 
-No file of one replaces a file of the other, so installing glibc causes no conflict in Zainium OS. Each program runs with the loader it was linked for: musl programs with musl, glibc programs with glibc. Zainium OS is musl-based by default. Whether to build your own software against musl or glibc is the user's choice.
+Nothing of glibc goes into the shared `bin`, `lib` or `include` directories, so the compiler, headers, `ldd` and programs of the base stay musl's. Each program runs with the loader it was linked for. A glibc program loads libraries only from glibc's directory (glibc's `libstdc++` and `libgcc_s` are there too); the libraries in `/overlayer/syshub/lib` are built for musl and cannot load into it. glibc's compiled-in paths point at the system's files: users, groups, hosts, DNS and the timezone come from `/overlayer/syshub/etc`, `/bin/sh` is `/overlayer/syshub/bin/sh`. zex installs glibc programs and libraries unchanged, without the musl loader and library path it gives packages from other distributions. Zainium OS is musl-based by default. Whether to build your own software against musl or glibc is the user's choice.
 
 ### Programs that expect FHS paths
 
-Software written for other distributions may open `/usr/...`, `/etc/...` or `/bin/...`. `libsys_resolver.so` is preloaded (`LD_PRELOAD`) into systemd services, login shells and PAM sessions. When such a path does not exist, it maps it to the Zainium path. It cannot help statically linked or setuid programs, because the loader does not preload into those.
+Software written for other distributions may open `/usr/...`, `/etc/...` or `/bin/...`. `libsys_resolver.so` is preloaded (`LD_PRELOAD`) into systemd services, login shells and PAM sessions. When such a path does not exist, it maps it to the Zainium path. A program built elsewhere whose loader is missing (`/lib64/ld-linux-x86-64.so.2`, `/lib/ld-musl-x86_64.so.1`) is started with this system's copy of that loader. The same library works in musl and glibc programs: it has no libc of its own. It cannot help statically linked or setuid programs, because the loader does not preload into those.
 
 ## 5. Software and upgrades
 
