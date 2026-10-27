@@ -105,7 +105,7 @@ zex history --package musl --limit 5
 ## Maintenance and recovery
 
 ```bash
-elevate zex doctor                 # audit registry, links, glibc contamination
+elevate zex doctor                 # audit registry, links, the base, musl and glibc
 elevate zex doctor --fix           # repair what it can
 elevate zex sweep --dry-run        # preview cache and temp cleanup
 elevate zex sweep --aggressive
