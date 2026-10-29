@@ -45,10 +45,10 @@ There is no `/usr`, `/etc`, `/bin`, `/sbin`, `/lib` or `/boot` at the root.
     │   └── engine/services/            syshub.toml (base package list), zex_services.toml (mirrors)
     ├── zexlib/
     │   ├── union/                      files of installed packages (bin, lib, etc, share, …)
+    │   │   ├── var/                    data of installed software (flatpak's system installation in var/lib/flatpak)
     │   │   └── x86_64-zainium-linux-gnu/  glibc (when installed): loader, libc, headers
     │   ├── work/                       OverlayFS work directory
-    │   ├── registry/                   one receipt per installed package, package index, caches, trust keys
-    │   └── var/                        data kept outside the union (flatpak's system installation)
+    │   └── registry/                   one receipt per installed package, package index, caches, trust keys
     ├── zaisys/
     │   ├── kernel/                     linux-evl, linux-panic, quantra-ramfs.img
     │   └── limine/                     BOOTX64.EFI, limine-bios.sys, limine.conf
@@ -137,7 +137,7 @@ Software written for other distributions may open `/usr/...`, `/etc/...` or `/bi
 - **Base protection:** a package never replaces a base file. Files the base already has are left out of the package.
 - **Records:** every install writes a receipt (`zexlib/registry/installed/<name>.toml`) listing its files. Removal deletes exactly those files.
 - **Base upgrades** (`zex syshub --u`): new base packages are downloaded, verified and staged in `/overlayer/.syshub-pending` (root only, immutable while waiting), then applied by quantra-ramfs at the next boot.
-- **Desktop applications** are also available through Flatpak, whose system installation lives in `zexlib/var/lib/flatpak`, and the COSMIC Store.
+- **Desktop applications** are also available through Flatpak, whose system installation lives in `zexlib/union/var/lib/flatpak` (by that path, not through the system view: OSTree cannot keep its repository on OverlayFS), and the COSMIC Store.
 
 ## 6. Privileges
 

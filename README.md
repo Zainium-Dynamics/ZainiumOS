@@ -38,10 +38,10 @@ The base system is compiled from upstream source with Zainium's own `x86_64-zain
     │   ├── drivers/                     kernel modules and firmware
     │   └── engine/services/             base package list, mirror configuration
     ├── zexlib/
-    │   ├── union/     files of installed packages (the OverlayFS upper layer)
+    │   ├── union/     files of installed packages (the OverlayFS upper layer); union/var holds
+    │   │              their data, such as flatpak's system installation
     │   ├── work/      OverlayFS work directory
-    │   ├── registry/  one receipt per installed package, index, caches, trust keys
-    │   └── var/       data kept outside the union (flatpak's system installation)
+    │   └── registry/  one receipt per installed package, index, caches, trust keys
     ├── zaisys/        kernel, initramfs, Limine boot loader (read-only)
     ├── agents/        instructions and skills for AI coding agents
     └── README.zainium  architecture.md  zex.md
