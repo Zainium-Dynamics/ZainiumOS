@@ -12,7 +12,7 @@
 
 **Zainium OS** is an independent, enterprise-grade Linux operating system — built from scratch and immutable by design. Its core stays intact whatever you install, upgrades apply atomically, and software for musl and glibc runs side by side. It is not derived from any other distribution, and it is a rolling release: install once and stay current, with no version numbers.
 
-It runs the Linux kernel (`linux-evl`), systemd as init and the COSMIC desktop on x86_64. The base system is compiled from upstream source with Zainium's own `x86_64-zainium-linux-musl` toolchain. Upstream software such as systemd, COSMIC, Mesa and musl is built from its source, not taken from another distribution's binaries. Original to ZainiumOS are the filesystem layout and its layer model, the package manager **zex**, the initramfs **quantra-ramfs**, the root tool **elevate**, the installer, the ISO builder and the package recipes.
+It runs its own build of the Linux kernel (`linux-zainium`), which follows the rolling release like everything else, systemd as init and the COSMIC desktop on x86_64. The base system is compiled from upstream source with Zainium's own `x86_64-zainium-linux-musl` toolchain. Upstream software such as systemd, COSMIC, Mesa and musl is built from its source, not taken from another distribution's binaries. Original to ZainiumOS are the filesystem layout and its layer model, the package manager **zex**, the initramfs **quantra-ramfs**, the root tool **elevate**, the installer, the ISO builder and the package recipes.
 
 ---
 
@@ -53,7 +53,7 @@ It runs the Linux kernel (`linux-evl`), systemd as init and the COSMIC desktop o
 
 ## Boot
 
-1. **Limine** (UEFI or BIOS) loads `linux-evl` and `quantra-ramfs.img`.
+1. **Limine** (UEFI or BIOS) loads the kernel (`linux-zainium`) and `quantra-ramfs.img`.
 2. **quantra-ramfs** starts the Plymouth splash, mounts the root (a disk partition, or the live ISO's zstd-compressed EROFS image), applies a staged base upgrade if one is waiting, and builds the OverlayFS view.
 3. **systemd** starts as PID 1 and runs **greetd** with **cosmic-greeter**, which starts the **COSMIC** desktop.
 

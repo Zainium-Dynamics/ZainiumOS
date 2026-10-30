@@ -2,9 +2,9 @@ Zainium OS
 ==========
 
 Zainium OS is an independent Linux operating system by Zainium Dynamics. It is
-not based on any other distribution. It uses the Linux kernel (linux-evl), the
-musl C library, systemd as init, and the COSMIC desktop. It runs on x86_64 and
-is licensed under GPL-3.0.
+not based on any other distribution. It uses its own Linux kernel
+(linux-zainium), the musl C library, systemd as init, and the COSMIC desktop.
+It runs on x86_64 and is licensed under GPL-3.0.
 
 Zainium OS takes a different approach from other Linux distributions. The main
 differences are below.
@@ -90,7 +90,7 @@ Main components
 ---------------
 
   Boot loader      Limine (UEFI and BIOS)
-  Kernel           linux-evl
+  Kernel           linux-zainium (rolling, updated with zex kernel)
   Initramfs        quantra-ramfs (finds the disk, joins the layers, applies
                    staged base upgrades, starts the Plymouth splash)
   Init             systemd

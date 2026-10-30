@@ -50,7 +50,7 @@ There is no `/usr`, `/etc`, `/bin`, `/sbin`, `/lib` or `/boot` at the root.
     │   ├── work/                       OverlayFS work directory
     │   └── registry/                   one receipt per installed package, package index, caches, trust keys
     ├── zaisys/
-    │   ├── kernel/                     linux-evl, linux-panic, quantra-ramfs.img
+    │   ├── kernel/                     linux-zainium, linux-panic, quantra-ramfs.img
     │   └── limine/                     BOOTX64.EFI, limine-bios.sys, limine.conf
     ├── agents/
     ├── README.zainium  architecture.md  zex.md
@@ -70,7 +70,7 @@ The base never receives a file from the userland. If the userland is deleted, th
 
 ## 3. How the system view is built at boot
 
-1. **Limine** (UEFI or BIOS) loads `linux-evl` and `quantra-ramfs.img` from `overlayer/zaisys`.
+1. **Limine** (UEFI or BIOS) loads the kernel (`linux-zainium`) and `quantra-ramfs.img` from `overlayer/zaisys`.
 2. **quantra-ramfs** (the initramfs) starts the Plymouth splash, waits for devices, and mounts the root:
    - installed system: the root partition;
    - live ISO: the image `zaisys/zairoot.img` (EROFS, zstd-compressed), loop-mounted read-only.
@@ -137,6 +137,7 @@ Software written for other distributions may open `/usr/...`, `/etc/...` or `/bi
 - **Base protection:** a package never replaces a base file. Files the base already has are left out of the package.
 - **Records:** every install writes a receipt (`zexlib/registry/installed/<name>.toml`) listing its files. Removal deletes exactly those files.
 - **Base upgrades** (`zex syshub --u`): new base packages are downloaded, verified and staged in `/overlayer/.syshub-pending` (root only, immutable while waiting), then applied by quantra-ramfs at the next boot.
+- **The kernel is rolling too** (`zex kernel --u`): the package `linux-kernel` puts the new kernel on the EFI partition and keeps the one that was running as the fallback entry (`linux-panic`); its modules (`linux-kernel-modules`) go into the base, and its headers (`linux-headers`) into the userland. All three are built from the same tree at the same time. No tool has the kernel's name written in: the installer and zex take it from what `zaisys/kernel` and `limine.conf` hold.
 - **Desktop applications** are also available through Flatpak, whose system installation lives in `zexlib/union/var/lib/flatpak` (by that path, not through the system view: OSTree cannot keep its repository on OverlayFS), and the COSMIC Store.
 
 ## 6. Privileges
